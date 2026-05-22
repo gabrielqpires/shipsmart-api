@@ -340,23 +340,32 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
         t.font=fnt(bold=True,sz=13,color=BRANCO); t.fill=fill(AZUL); t.alignment=aln('center')
         wt.row_dimensions[1].height=30
 
-        def val_liquido(r):
-            return pbr(r.get('Valor da Conta','')) - pbr(r.get('Desconto',''))
-
-        ta=sum(val_liquido(r) for r in df_atras)
-        ts=sum(val_liquido(r) for r in df_semana)
-        tv=sum(val_liquido(r) for r in df_avenc)
-        tg=ta+ts+tv
-
-        kpis=[('Vencido',ta,VERM_LT,VERM_TX),
-              (f'Vence esta semana ({seg_semana.strftime("%d/%m")}–{dom_semana.strftime("%d/%m")})',ts,LARANJA_LT,'7B3F00'),
-              ('A Vencer',tv,AMARELO_LT,'5C3D00'),('Total Geral',tg,AZUL2,BRANCO)]
+        # KPIs como referência visual (labels) — valores serão fórmulas dinâmicas
+        kpi_labels=[
+            ('Vencido',                VERM_LT,   VERM_TX),
+            (f'Vence esta semana ({seg_semana.strftime("%d/%m")}–{dom_semana.strftime("%d/%m")})', LARANJA_LT,'7B3F00'),
+            ('A Vencer',               AMARELO_LT,'5C3D00'),
+            ('Total Geral',            AZUL2,      BRANCO),
+        ]
         wt.row_dimensions[2].height=8; wt.row_dimensions[3].height=30; wt.row_dimensions[4].height=18
 
-        for ki,(klbl,kval,kbg,kfc) in enumerate(kpis):
+        # Coluna B = Previsão de Pagamento, Coluna E = Valor a Pagar
+        # SUMIF dinâmico: soma E onde B < hoje / B entre seg e dom / B > dom
+        hoje_str   = HOJE.strftime('%Y-%m-%d')
+        seg_str    = seg_semana.strftime('%Y-%m-%d')
+        dom_str    = dom_semana.strftime('%Y-%m-%d')
+
+        kpi_formulas = [
+            f'=SUMPRODUCT((B6:B9999<"{hoje_str}")*(E6:E9999))',
+            f'=SUMPRODUCT((B6:B9999>="{seg_str}")*(B6:B9999<="{dom_str}")*(E6:E9999))',
+            f'=SUMPRODUCT((B6:B9999>"{dom_str}")*(E6:E9999))',
+            f'=SUMPRODUCT((B6:B9999<>"")*(E6:E9999))',
+        ]
+
+        for ki,(klbl,kbg,kfc) in enumerate(kpi_labels):
             cs=ki*2+1; ce=cs+1
             for r2 in [3,4]: wt.merge_cells(f'{get_column_letter(cs)}{r2}:{get_column_letter(ce)}{r2}')
-            ck=wt.cell(row=3,column=cs,value=kval); ck.number_format=BRL
+            ck=wt.cell(row=3,column=cs,value=kpi_formulas[ki]); ck.number_format=BRL
             ck.font=fnt(bold=True,sz=13,color=kfc); ck.fill=fill(kbg)
             ck.alignment=aln('center'); ck.border=BDR
             wt.cell(row=3,column=cs+1).fill=fill(kbg); wt.cell(row=3,column=cs+1).border=BDR
