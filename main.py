@@ -266,7 +266,7 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
             c.value=formula; c.number_format=BRL
             c.font=fnt(sz=9,color=fc2); c.fill=fill(bg); c.border=BDR; c.alignment=aln('right')
         c23=ws.cell(row=23,column=col)
-        c23.value=f'=IFERROR(B32,0)+IFERROR({cl}21,0)-IFERROR({cl}22,0)' if i==0 \
+        c23.value=f'=IFERROR(B30,0)+IFERROR({cl}21,0)-IFERROR({cl}22,0)' if i==0 \
                   else f'=IFERROR({pcl}23,0)+IFERROR({cl}21,0)-IFERROR({cl}22,0)'
         c23.number_format=BRL; c23.font=fnt(bold=True,sz=9,color=BRANCO)
         c23.fill=fill(AZUL); c23.border=BDR; c23.alignment=aln('right')
@@ -361,9 +361,9 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
             cl2.font=fnt(sz=9,color=kfc); cl2.fill=fill(kbg); cl2.alignment=aln('center'); cl2.border=BDR
             wt.cell(row=4,column=cs+1).fill=fill(kbg); wt.cell(row=4,column=cs+1).border=BDR
 
-        COLS=['Nota Fiscal','Previsão de Pagamento','Valor da Conta','Desconto','Valor a Pagar','Observação']
-        LABELS=['Nota Fiscal','Previsão Pgto','Valor Fatura','Desconto','Valor a Pagar','Observação']
-        WIDTHS=[18,16,16,12,16,0]
+        COLS=['Nota Fiscal','Previsão de Pagamento','Valor da Conta','_CONTESTADO','Valor a Pagar','Observação']
+        LABELS=['Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Observação']
+        WIDTHS=[18,16,16,36,16,0]
         for ci,w in enumerate(WIDTHS,1):
             if w>0: wt.column_dimensions[get_column_letter(ci)].width=w
         obs_max=max((len(r.get('Observação','') or '') for r in df_ab), default=20)
@@ -393,10 +393,15 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
                     c=wt.cell(row=r3,column=ci)
                     c.fill=fill(bg); c.border=BDR; c.font=fnt(sz=9)
                     if col=='Valor a Pagar':
-                        c.value=pbr(v); c.number_format=BRL
+                        cl_fatura    = get_column_letter(COLS.index('Valor da Conta')+1)
+                        cl_contestado= get_column_letter(COLS.index('_CONTESTADO')+1)
+                        c.value=f'={cl_fatura}{r3}-{cl_contestado}{r3}'
+                        c.number_format=BRL
                         c.alignment=aln('right'); c.font=fnt(sz=9,bold=True,color=VERM_TX)
-                    elif col in ['Valor da Conta','Desconto']:
-                        c.value=pbr(v); c.number_format=BRL; c.alignment=aln('right')
+                    elif col=='_CONTESTADO':
+                        c.value=0; c.number_format=BRL; c.alignment=aln('right')
+                    elif col=='Valor da Conta':
+                        c.value=pbr(r2.get('Valor da Conta','') or ''); c.number_format=BRL; c.alignment=aln('right')
                     elif col=='Previsão de Pagamento':
                         c.value=str(prev) if prev else ''; c.alignment=aln('center')
                         if dias>60: c.font=fnt(sz=9,color=VERM_TX,bold=True)
