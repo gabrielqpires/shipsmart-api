@@ -340,9 +340,12 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
         t.font=fnt(bold=True,sz=13,color=BRANCO); t.fill=fill(AZUL); t.alignment=aln('center')
         wt.row_dimensions[1].height=30
 
-        ta=sum(pbr(r.get('Valor a Pagar','')) for r in df_atras)
-        ts=sum(pbr(r.get('Valor a Pagar','')) for r in df_semana)
-        tv=sum(pbr(r.get('Valor a Pagar','')) for r in df_avenc)
+        def val_liquido(r):
+            return pbr(r.get('Valor da Conta','')) - pbr(r.get('Desconto',''))
+
+        ta=sum(val_liquido(r) for r in df_atras)
+        ts=sum(val_liquido(r) for r in df_semana)
+        tv=sum(val_liquido(r) for r in df_avenc)
         tg=ta+ts+tv
 
         kpis=[('Vencido',ta,VERM_LT,VERM_TX),
@@ -399,7 +402,7 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
                         c.number_format=BRL
                         c.alignment=aln('right'); c.font=fnt(sz=9,bold=True,color=VERM_TX)
                     elif col=='_CONTESTADO':
-                        c.value=0; c.number_format=BRL; c.alignment=aln('right')
+                        c.value=pbr(r2.get('Desconto','') or ''); c.number_format=BRL; c.alignment=aln('right')
                     elif col=='Valor da Conta':
                         c.value=pbr(r2.get('Valor da Conta','') or ''); c.number_format=BRL; c.alignment=aln('right')
                     elif col=='Previsão de Pagamento':
