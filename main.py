@@ -356,10 +356,10 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
         dom_str    = dom_semana.strftime('%Y-%m-%d')
 
         kpi_formulas = [
-            f'=SUMPRODUCT((B6:B9999<"{hoje_str}")*(E6:E9999))',
-            f'=SUMPRODUCT((B6:B9999>="{seg_str}")*(B6:B9999<="{dom_str}")*(E6:E9999))',
-            f'=SUMPRODUCT((B6:B9999>"{dom_str}")*(E6:E9999))',
-            f'=SUMPRODUCT((B6:B9999<>"")*(E6:E9999))',
+            f'=SUMPRODUCT((B8:B9999<"{hoje_str}")*ISNUMBER(E8:E9999)*(E8:E9999))',
+            f'=SUMPRODUCT((B8:B9999>="{seg_str}")*(B8:B9999<="{dom_str}")*ISNUMBER(E8:E9999)*(E8:E9999))',
+            f'=SUMPRODUCT((B8:B9999>"{dom_str}")*ISNUMBER(E8:E9999)*(E8:E9999))',
+            f'=SUMPRODUCT(ISNUMBER(E8:E9999)*(E8:E9999))',
         ]
 
         for ki,(klbl,kbg,kfc) in enumerate(kpi_labels):
