@@ -57,7 +57,10 @@ def parse_csv(content: bytes) -> list[dict]:
 
 # ─── Gerar XLSX ───────────────────────────────────────────────────────────────
 def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
-    HOJE = date.today()
+    import os
+    from datetime import timezone, timedelta as td
+    # Força fuso de Brasília (UTC-3)
+    HOJE = (datetime.now(timezone(td(hours=-3)))).date()
     FIM  = HOJE + timedelta(days=30)
     datas = [HOJE + timedelta(days=i) for i in range(31)]
 
@@ -326,12 +329,10 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
                if nome_forn.upper() in (r.get('Fornecedor (Nome Fantasia)','') or '').upper()
                and pbr(r.get('Valor a Pagar',''))>0]
 
-        df_atras =[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.max) <= HOJE]
-        df_semana=[r for r in df_ab if HOJE < (pdate(r.get('Previsão de Pagamento','')) or date.min) <= dom_semana]
-        df_avenc =[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.min) > dom_semana]
+        df_atras=[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.max) <= HOJE]
+        df_avenc =[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.min) > HOJE]
 
-        df_atras.sort( key=lambda r: pdate(r.get('Previsão de Pagamento','')) or date.max)
-        df_semana.sort(key=lambda r: pdate(r.get('Previsão de Pagamento','')) or date.max)
+        df_atras.sort(key=lambda r: pdate(r.get('Previsão de Pagamento','')) or date.max)
         df_avenc.sort( key=lambda r: pdate(r.get('Previsão de Pagamento','')) or date.max)
 
         wt.merge_cells('A1:J1')
@@ -340,32 +341,17 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
         t.font=fnt(bold=True,sz=13,color=BRANCO); t.fill=fill(AZUL); t.alignment=aln('center')
         wt.row_dimensions[1].height=30
 
-        # KPIs como referência visual (labels) — valores serão fórmulas dinâmicas
         kpi_labels=[
-            ('Vencido',                VERM_LT,   VERM_TX),
-            (f'Vence esta semana ({seg_semana.strftime("%d/%m")}–{dom_semana.strftime("%d/%m")})', LARANJA_LT,'7B3F00'),
-            ('A Vencer',               AMARELO_LT,'5C3D00'),
-            ('Total Geral',            AZUL2,      BRANCO),
+            ('Vencido',    VERM_LT,   VERM_TX),
+            ('A Vencer',   AMARELO_LT,'5C3D00'),
+            ('Total Geral',AZUL2,      BRANCO),
         ]
         wt.row_dimensions[2].height=8; wt.row_dimensions[3].height=30; wt.row_dimensions[4].height=18
-
-        # Coluna B = Previsão de Pagamento, Coluna E = Valor a Pagar
-        # SUMIF dinâmico: soma E onde B < hoje / B entre seg e dom / B > dom
-        hoje_str   = HOJE.strftime('%Y-%m-%d')
-        seg_str    = seg_semana.strftime('%Y-%m-%d')
-        dom_str    = dom_semana.strftime('%Y-%m-%d')
-
-        kpi_formulas = [
-            f'=SUMPRODUCT((B8:B9999<"{hoje_str}")*ISNUMBER(E8:E9999)*(E8:E9999))',
-            f'=SUMPRODUCT((B8:B9999>="{seg_str}")*(B8:B9999<="{dom_str}")*ISNUMBER(E8:E9999)*(E8:E9999))',
-            f'=SUMPRODUCT((B8:B9999>"{dom_str}")*ISNUMBER(E8:E9999)*(E8:E9999))',
-            f'=SUMPRODUCT(ISNUMBER(E8:E9999)*(E8:E9999))',
-        ]
 
         for ki,(klbl,kbg,kfc) in enumerate(kpi_labels):
             cs=ki*2+1; ce=cs+1
             for r2 in [3,4]: wt.merge_cells(f'{get_column_letter(cs)}{r2}:{get_column_letter(ce)}{r2}')
-            ck=wt.cell(row=3,column=cs,value=kpi_formulas[ki]); ck.number_format=BRL
+            ck=wt.cell(row=3,column=cs,value=0); ck.number_format=BRL
             ck.font=fnt(bold=True,sz=13,color=kfc); ck.fill=fill(kbg)
             ck.alignment=aln('center'); ck.border=BDR
             wt.cell(row=3,column=cs+1).fill=fill(kbg); wt.cell(row=3,column=cs+1).border=BDR
@@ -431,25 +417,18 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
         end_atras = cur - 1
         if df_atras: wt.row_dimensions[cur].height=8; cur+=1
 
-        start_semana = cur
-        cur=write_sec(cur,f'🟠  VENCEM ESTA SEMANA ({seg_semana.strftime("%d/%m")}–{dom_semana.strftime("%d/%m")})',df_semana,'8B5E00',LARANJA_LT,'FFE5CC')
-        end_semana = cur - 1
-        if df_semana: wt.row_dimensions[cur].height=8; cur+=1
-
         start_avenc = cur
         cur=write_sec(cur,'🟡  A VENCER',df_avenc,'7A6200',AMARELO_LT,'FFF0B0')
         end_avenc = cur - 1
 
-        # KPIs dinâmicos com ranges exatos
-        col_e = get_column_letter(5)  # Valor a Pagar = coluna E
+        col_e = get_column_letter(5)
         def kpi_formula(start, end):
             if start > end: return 0
             return f'=IFERROR(SUM({col_e}{start+2}:{col_e}{end}),0)'
 
         kpi_values = [
-            kpi_formula(start_atras,  end_atras),
-            kpi_formula(start_semana, end_semana),
-            kpi_formula(start_avenc,  end_avenc),
+            kpi_formula(start_atras, end_atras),
+            kpi_formula(start_avenc, end_avenc),
             f'=IFERROR(SUM({col_e}{start_atras+2}:{col_e}{end_avenc}),0)',
         ]
 
