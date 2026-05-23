@@ -326,8 +326,8 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
                if nome_forn.upper() in (r.get('Fornecedor (Nome Fantasia)','') or '').upper()
                and pbr(r.get('Valor a Pagar',''))>0]
 
-        df_atras =[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.max) < HOJE]
-        df_semana=[r for r in df_ab if HOJE <= (pdate(r.get('Previsão de Pagamento','')) or date.min) <= dom_semana]
+        df_atras =[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.max) <= HOJE]
+        df_semana=[r for r in df_ab if HOJE < (pdate(r.get('Previsão de Pagamento','')) or date.min) <= dom_semana]
         df_avenc =[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.min) > dom_semana]
 
         df_atras.sort( key=lambda r: pdate(r.get('Previsão de Pagamento','')) or date.max)
@@ -425,11 +425,40 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
             return start+2+len(rows_sec)
 
         cur=6; wt.row_dimensions[cur].height=10; cur+=1
+
+        start_atras = cur
         cur=write_sec(cur,'🔴  VENCIDOS',df_atras,'A02020',VERM_LT,'FFD7D7')
+        end_atras = cur - 1
         if df_atras: wt.row_dimensions[cur].height=8; cur+=1
+
+        start_semana = cur
         cur=write_sec(cur,f'🟠  VENCEM ESTA SEMANA ({seg_semana.strftime("%d/%m")}–{dom_semana.strftime("%d/%m")})',df_semana,'8B5E00',LARANJA_LT,'FFE5CC')
+        end_semana = cur - 1
         if df_semana: wt.row_dimensions[cur].height=8; cur+=1
-        write_sec(cur,'🟡  A VENCER',df_avenc,'7A6200',AMARELO_LT,'FFF0B0')
+
+        start_avenc = cur
+        cur=write_sec(cur,'🟡  A VENCER',df_avenc,'7A6200',AMARELO_LT,'FFF0B0')
+        end_avenc = cur - 1
+
+        # KPIs dinâmicos com ranges exatos
+        col_e = get_column_letter(5)  # Valor a Pagar = coluna E
+        def kpi_formula(start, end):
+            if start > end: return 0
+            return f'=IFERROR(SUM({col_e}{start+2}:{col_e}{end}),0)'
+
+        kpi_values = [
+            kpi_formula(start_atras,  end_atras),
+            kpi_formula(start_semana, end_semana),
+            kpi_formula(start_avenc,  end_avenc),
+            f'=IFERROR(SUM({col_e}{start_atras+2}:{col_e}{end_avenc}),0)',
+        ]
+
+        for ki, kval in enumerate(kpi_values):
+            cs = ki*2+1
+            c = wt.cell(row=3, column=cs)
+            c.value = kval
+            c.number_format = BRL
+
         wt.freeze_panes='A5'
 
     make_transp('FEDEX','FEDEX')
