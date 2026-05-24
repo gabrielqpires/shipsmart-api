@@ -269,7 +269,7 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
             c.value=formula; c.number_format=BRL
             c.font=fnt(sz=9,color=fc2); c.fill=fill(bg); c.border=BDR; c.alignment=aln('right')
         c23=ws.cell(row=23,column=col)
-        c23.value=f'=IFERROR(B30,0)+IFERROR({cl}21,0)-IFERROR({cl}22,0)' if i==0 \
+        c23.value=f'=IFERROR(B32,0)+IFERROR({cl}21,0)-IFERROR({cl}22,0)' if i==0 \
                   else f'=IFERROR({pcl}23,0)+IFERROR({cl}21,0)-IFERROR({cl}22,0)'
         c23.number_format=BRL; c23.font=fnt(bold=True,sz=9,color=BRANCO)
         c23.fill=fill(AZUL); c23.border=BDR; c23.alignment=aln('right')
