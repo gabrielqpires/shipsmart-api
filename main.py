@@ -61,8 +61,12 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
     from datetime import timezone, timedelta as td
     # Força fuso de Brasília (UTC-3)
     HOJE = (datetime.now(timezone(td(hours=-3)))).date()
-    FIM  = HOJE + timedelta(days=30)
-    datas = [HOJE + timedelta(days=i) for i in range(31)]
+    # Fim = dia 5 do mês M+2
+    mes_fim = HOJE.month + 2
+    ano_fim = HOJE.year + (1 if mes_fim > 12 else 0)
+    mes_fim = mes_fim - 12 if mes_fim > 12 else mes_fim
+    FIM = date(ano_fim, mes_fim, 5)
+    datas = [HOJE + timedelta(days=i) for i in range((FIM - HOJE).days + 1)]
 
     dia_semana = HOJE.weekday()
     seg_semana = HOJE - timedelta(days=dia_semana)
