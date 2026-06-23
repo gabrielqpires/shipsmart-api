@@ -325,13 +325,19 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
     ws.freeze_panes=f'{get_column_letter(COL_D0)}11'
 
     # ══════════ TRANSPORTADORAS ═══════════════════════════════════════════════
-    def make_transp(nome_aba, nome_forn):
+    def make_transp(nome_aba, nome_forn=None, excluir=None):
         wt=wb.create_sheet(nome_aba)
         wt.sheet_view.showGridLines=False
 
-        df_ab=[r for r in rows_p
-               if nome_forn.upper() in (r.get('Fornecedor (Nome Fantasia)','') or '').upper()
-               and pbr(r.get('Valor a Pagar',''))>0]
+        if nome_forn:
+            df_ab=[r for r in rows_p
+                   if nome_forn.upper() in (r.get('Fornecedor (Nome Fantasia)','') or '').upper()
+                   and pbr(r.get('Valor a Pagar',''))>0]
+        else:
+            excluir = excluir or []
+            df_ab=[r for r in rows_p
+                   if not any(e.upper() in (r.get('Fornecedor (Nome Fantasia)','') or '').upper() for e in excluir)
+                   and pbr(r.get('Valor a Pagar',''))>0]
 
         df_atras=[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.max) <= HOJE]
         df_avenc =[r for r in df_ab if (pdate(r.get('Previsão de Pagamento','')) or date.min) > HOJE]
@@ -341,7 +347,7 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
 
         wt.merge_cells('A1:J1')
         t=wt.cell(row=1,column=1)
-        t.value=f'CONTAS A PAGAR — {nome_forn.upper()}  |  {HOJE.strftime("%d/%m/%Y")}'
+        t.value=f'CONTAS A PAGAR — {(nome_forn or nome_aba).upper()}  |  {HOJE.strftime("%d/%m/%Y")}'
         t.font=fnt(bold=True,sz=13,color=BRANCO); t.fill=fill(AZUL); t.alignment=aln('center')
         wt.row_dimensions[1].height=30
 
@@ -363,9 +369,9 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
             cl2.font=fnt(sz=9,color=kfc); cl2.fill=fill(kbg); cl2.alignment=aln('center'); cl2.border=BDR
             wt.cell(row=4,column=cs+1).fill=fill(kbg); wt.cell(row=4,column=cs+1).border=BDR
 
-        COLS=['Nota Fiscal','Previsão de Pagamento','Valor da Conta','_CONTESTADO','Valor a Pagar','Observação']
-        LABELS=['Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Observação']
-        WIDTHS=[18,16,16,36,16,0]
+        COLS=['Nota Fiscal','Previsão de Pagamento','Valor da Conta','_CONTESTADO','Valor a Pagar','Categoria','Observação']
+        LABELS=['Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Categoria','Observação']
+        WIDTHS=[18,16,16,36,16,18,0]
         for ci,w in enumerate(WIDTHS,1):
             if w>0: wt.column_dimensions[get_column_letter(ci)].width=w
         obs_max=max((len(r.get('Observação','') or '') for r in df_ab), default=20)
@@ -404,6 +410,8 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
                         c.value=pbr(r2.get('Desconto','') or ''); c.number_format=BRL; c.alignment=aln('right')
                     elif col=='Valor da Conta':
                         c.value=pbr(r2.get('Valor da Conta','') or ''); c.number_format=BRL; c.alignment=aln('right')
+                    elif col=='Categoria':
+                        c.value=str(r2.get('Categoria','') or ''); c.alignment=aln()
                     elif col=='Previsão de Pagamento':
                         c.value=str(prev) if prev else ''; c.alignment=aln('center')
                         if dias>60: c.font=fnt(sz=9,color=VERM_TX,bold=True)
@@ -447,6 +455,8 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
     make_transp('FEDEX','FEDEX')
     make_transp('UPS','UPS DO BRASIL')
     make_transp('DHL','DHL EXPRESS')
+    make_transp('LOGGI','LOGGI')
+    make_transp('OUTROS', excluir=['FEDEX','UPS DO BRASIL','DHL EXPRESS','LOGGI'])
 
     # ══════════ BASES (ocultas) ════════════════════════════════════════════════
     def write_base(nome, rows, val_cols, date_cols):
@@ -483,7 +493,7 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
     write_base('BASE_RECEBER',rows_r,val_r,date_r)
     write_base('BASE_PAGAR',rows_p,val_p,date_p)
 
-    order=['FLUXO_DIARIO','FEDEX','UPS','DHL','BASE_RECEBER','BASE_PAGAR']
+    order=['FLUXO_DIARIO','FEDEX','UPS','DHL','LOGGI','OUTROS','BASE_RECEBER','BASE_PAGAR']
     wb._sheets.sort(key=lambda s: order.index(s.title) if s.title in order else 99)
 
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
