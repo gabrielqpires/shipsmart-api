@@ -369,13 +369,18 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
             cl2.font=fnt(sz=9,color=kfc); cl2.fill=fill(kbg); cl2.alignment=aln('center'); cl2.border=BDR
             wt.cell(row=4,column=cs+1).fill=fill(kbg); wt.cell(row=4,column=cs+1).border=BDR
 
-        COLS=['Nota Fiscal','Previsão de Pagamento','Valor da Conta','_CONTESTADO','Valor a Pagar','Categoria','Observação']
-        LABELS=['Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Categoria','Observação']
-        WIDTHS=[18,16,16,36,16,18,0]
+        if nome_forn:
+            COLS=['Nota Fiscal','Previsão de Pagamento','Valor da Conta','_CONTESTADO','Valor a Pagar','Categoria','Observação']
+            LABELS=['Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Categoria','Observação']
+            WIDTHS=[18,16,16,36,16,18,0]
+        else:
+            COLS=['Fornecedor (Nome Fantasia)','Nota Fiscal','Previsão de Pagamento','Valor da Conta','_CONTESTADO','Valor a Pagar','Categoria','Observação']
+            LABELS=['Fornecedor','Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Categoria','Observação']
+            WIDTHS=[28,18,16,16,36,16,18,0]
         for ci,w in enumerate(WIDTHS,1):
             if w>0: wt.column_dimensions[get_column_letter(ci)].width=w
         obs_max=max((len(r.get('Observação','') or '') for r in df_ab), default=20)
-        wt.column_dimensions['F'].width=max(20,min(80,obs_max*0.9))
+        wt.column_dimensions[get_column_letter(len(COLS))].width=max(20,min(80,obs_max*0.9))
 
         def write_sec(start,title,rows_sec,title_bg,bg1,bg2):
             if not rows_sec: return start
@@ -412,6 +417,8 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
                         c.value=pbr(r2.get('Valor da Conta','') or ''); c.number_format=BRL; c.alignment=aln('right')
                     elif col=='Categoria':
                         c.value=str(r2.get('Categoria','') or ''); c.alignment=aln()
+                    elif col=='Fornecedor (Nome Fantasia)':
+                        c.value=str(r2.get('Fornecedor (Nome Fantasia)','') or ''); c.alignment=aln()
                     elif col=='Previsão de Pagamento':
                         c.value=str(prev) if prev else ''; c.alignment=aln('center')
                         if dias>60: c.font=fnt(sz=9,color=VERM_TX,bold=True)
