@@ -374,13 +374,16 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
             LABELS=['Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Categoria','Observação']
             WIDTHS=[18,16,16,36,16,18,0]
         else:
-            COLS=['Fornecedor (Nome Fantasia)','Nota Fiscal','Previsão de Pagamento','Valor da Conta','_CONTESTADO','Valor a Pagar','Categoria','Observação']
-            LABELS=['Fornecedor','Nota Fiscal','Previsão Pgto','Valor Fatura','Valor Contestado (segundo planilha [FIN] AP BR Faturas Pago x Contestado)','Valor a Pagar','Categoria','Observação']
-            WIDTHS=[28,18,16,16,36,16,18,0]
+            COLS=['Fornecedor (Nome Fantasia)','Nota Fiscal','Previsão de Pagamento','Valor da Conta','Categoria','Observação']
+            LABELS=['Fornecedor','Nota Fiscal','Previsão Pgto','Valor da Conta','Categoria','Observação']
+            WIDTHS=[443,18,16,16,90,0]
         for ci,w in enumerate(WIDTHS,1):
             if w>0: wt.column_dimensions[get_column_letter(ci)].width=w
         obs_max=max((len(r.get('Observação','') or '') for r in df_ab), default=20)
-        wt.column_dimensions[get_column_letter(len(COLS))].width=max(20,min(80,obs_max*0.9))
+        if nome_forn:
+            wt.column_dimensions[get_column_letter(len(COLS))].width=max(20,min(80,obs_max*0.9))
+        else:
+            wt.column_dimensions[get_column_letter(len(COLS))].width=max(40,min(120,obs_max*0.9))
 
         def write_sec(start,title,rows_sec,title_bg,bg1,bg2):
             if not rows_sec: return start
@@ -415,6 +418,7 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
                         c.value=pbr(r2.get('Desconto','') or ''); c.number_format=BRL; c.alignment=aln('right')
                     elif col=='Valor da Conta':
                         c.value=pbr(r2.get('Valor da Conta','') or ''); c.number_format=BRL; c.alignment=aln('right')
+                        c.font=fnt(sz=9,bold=True,color=VERM_TX) if not nome_forn else fnt(sz=9)
                     elif col=='Categoria':
                         c.value=str(r2.get('Categoria','') or ''); c.alignment=aln()
                     elif col=='Fornecedor (Nome Fantasia)':
@@ -440,7 +444,8 @@ def gerar_xlsx(rows_p: list[dict], rows_r: list[dict]) -> bytes:
         cur=write_sec(cur,'🟡  A VENCER',df_avenc,'7A6200',AMARELO_LT,'FFF0B0')
         end_avenc = cur - 1
 
-        col_e = get_column_letter(5)
+        col_valor = 'Valor a Pagar' if 'Valor a Pagar' in COLS else 'Valor da Conta'
+        col_e = get_column_letter(COLS.index(col_valor)+1)
         def kpi_formula(start, end):
             if start > end: return 0
             return f'=IFERROR(SUM({col_e}{start+2}:{col_e}{end}),0)'
